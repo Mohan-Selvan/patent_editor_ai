@@ -1,60 +1,113 @@
-# Patent Editor AI
+# AI-Assisted Patent Editor
 
-This repository cnotains a patent editor application (both server and client). This is based on the works of Solve Intelligence.
-Following sections contains information on features and usage instructions 
+A full-stack patent drafting editor where an LLM streams real-time suggestions, rephrases claims, and scores the document for office-action risk. Built as a study in **human-in-the-loop LLM UX** for high-precision, high-stakes writing.
 
-## Features Overview
+## TL;DR
 
-- **Document Versioning**:  
-  Users can create new versions, switch between versions, and edit/save any version.
+Patent drafting is expensive, slow, and unforgiving: a single sloppy claim can invalidate the whole application. This project explores what happens when you give the drafter an **LLM co-pilot in the editor itself** - not a chat window beside the document, but suggestions streamed live into the writing surface, tagged by severity.
 
-- **Real-Time AI Suggestions**:  
-  WebSocket integration completed. The editor now streams AI suggestions in a side panel, sorted by severity (high, medium, low).
+Core loop: type, see AI suggestions appear sorted by severity (high/medium/low), accept or reject, repeat. Trigger a full-document analysis to get a 0-100 quality score and a list of potential office-action triggers.
 
-- **AI Rephrase**:  
-  Highlight text and click on "Rephrase for Clarity" to get an AI-generated alternative wording.
+## Why this problem
 
-- **AI Patent Analysis**:  
-  Analyse the entire document to receive a score (0–100) and a list of potential issues that might trigger office actions.
+The project is a specific case of a general question I care about:
 
----
+> How should an LLM expose its confidence and rationale inside a workflow where the human is legally accountable for the output?
 
-## How to Run
+Patent law is the hardest version of this question because:
 
-1. Start the app using `docker-compose up --build`
+- Every word has legal weight. Small rephrasings change claim scope.
+- Humans sign off on the final document. The LLM is advisory, never authoritative.
+- Mistakes surface slowly (months later, in office actions). The feedback loop is terrible.
 
-2. Open the client at `http://localhost:5173`
+The editor is my attempt to make the LLM visibly advisory, with explicit severity tags so the drafter can triage rather than read every suggestion.
 
-Here is a snapshot of the UI..
+## Features
 
-![Snapshot of the UI](./snapshot.png)
+### Document versioning
+Create new versions, switch between versions, edit and save any version. Switching versions sets that version as the latest, which is what gets loaded next time.
 
-#### Document Versioning
+### Real-time AI suggestions
+WebSocket streams suggestions into a side panel as you type, sorted by severity. Suggestions are tagged as:
 
-- Load `Patent 1` or `Patent 2` by clicking on the buttons in the top-right corner.
+- **High** - likely to trigger office actions or invalidate a claim.
+- **Medium** - style or clarity issues that weaken the patent.
+- **Low** - minor phrasing notes.
 
-- After editing the document click on `Save` button to save the current version of the document to the DB.
+### AI rephrase
+Highlight a claim, click "Rephrase for Clarity", and the LLM returns an alternate phrasing that follows common patent conventions. Approve or reject inline.
 
-- Click on `Save As` to save the content in a new version of the document.
+### AI patent analysis
+Run a full-document analysis. Returns:
 
-- Switch between different versions of the document using the `versions drop down` on the top-right corner of the editor. Switching versions sets the selected version as the latest version so the latest version of the document is loaded when the patent is opened.
+- A 0-100 quality score.
+- A list of potential issues that could trigger office actions or rejection.
 
-#### Real-Time AI Suggestions
+## Architecture
 
-Start typing in the editor. Suggestions will appear in the sidebar automatically in the "AI Suggestion" section. Suggestions are sorted based on their severity.
+```mermaid
+flowchart LR
+    E[TypeScript editor<br/>client] <-->|WebSocket| S[Python server]
+    S --> L[LLM]
+    S --> DB[(Patent DB)]
+    E -->|REST| S
+    L -->|suggestions<br/>by severity| E
+```
 
-#### AI Rephrase
+UI snapshot:
 
-Highlight a claim in the patent and Click on `Rephrase for Clarity` button in the AI Rephrase section to get an alternate phrasing following the common rules of patent document. An option is provided to approve or reject the alternate phrasing.
+![UI snapshot](./snapshot.png)
 
-#### AI Patent Analysis
+## Tech
 
-Open the AI Analysis panel. Click `Analyse Patent` to generate a score based on the common practice of patents along with a list of problematic areas in the document that could potentially result in further office actions or even patent rejection.
+Python (backend) - TypeScript (frontend) - React - Postgres - WebSockets - LLM API - Docker Compose
 
-### Credits
+## Repo tour
 
-This application is based on the works of Solve Intelligence. Check them out!
+```
+.
+├── client/                 # TypeScript + React editor
+├── server/                 # Python backend, WebSocket, LLM calls
+├── docker-compose.yml
+├── snapshot.png
+├── LICENSE                 # Apache 2.0
+└── README.md
+```
 
-### Contact
+## Run it
 
-Please email `mohanselvan.r.5814@gmail.com` to collaborate, or if you have any queries!
+1. `docker-compose up --build` from the repo root.
+2. Open the client at `http://localhost:5173`.
+
+### Using the editor
+
+**Document versioning**
+- Load `Patent 1` or `Patent 2` via the top-right buttons.
+- Edit and click `Save` to overwrite the current version.
+- Click `Save As` to persist as a new version.
+- Use the versions dropdown (top-right) to switch.
+
+**Real-time AI suggestions**
+- Start typing. Suggestions appear automatically in the sidebar under "AI Suggestion", sorted by severity.
+
+**AI rephrase**
+- Highlight a claim and click `Rephrase for Clarity`.
+- Accept or reject the alternate phrasing.
+
+**AI patent analysis**
+- Open the AI Analysis panel and click `Analyse Patent`.
+- Review the score and flagged issues.
+
+## Where this could go
+
+- Calibrate severity labels against historical office-action data (does a "high" suggestion predict actual rejection?).
+- Add a "why" panel for each suggestion: the LLM's rationale and which section of which patent guideline it's applying.
+- Eval harness that compares LLM suggestions against a held-out set of attorney-reviewed claims.
+
+## Attribution
+
+Based on the works of Solve Intelligence. Check them out!
+
+## Contact
+
+mohanselvan.r.5814@gmail.com
